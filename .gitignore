@@ -358,3 +358,5 @@ dist
 
 raw-word-lists/
 data/
+maintest.py
+tooltest.py
