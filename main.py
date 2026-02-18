@@ -22,10 +22,52 @@ local_tools = [
 
 def assistant(state: AgentState):
     
+    textual_description_of_tools = """
+    
+    def get_n_random_words(language: str, n: int) -> list:
+    
+    Retrieve a specified number of random words from a language-specific word list.
+    
+    Args:
+        language (str): The language code (e.g., 'spanish', 'french') to determine 
+                       which word list to use. Must correspond to a directory 
+                       in the 'data' folder.
+        n (int): The number of random words to retrieve. Must be less than or 
+                equal to the total number of words in the word list.
+    
+    Returns:
+        list: A list of randomly selected words from the specified language's 
+              word list. Each word is returned as a string.
+    
+    Raises:
+        FileNotFoundError: If the word list file doesn't exist for the specified 
+                          language.
+        KeyError: If the word list file structure is invalid.
+        ValueError: If n is larger than the available words in the list.
+    
+    Note:
+        The function expects word lists to be stored in JSON format at:
+        'data/{language}/word-list-cleaned.json'
+        Each entry in the JSON should have a 'word' key containing the word.
+    """
+    
     sys_msg = SystemMessage(content=f"""
-        You are a helpful language learning assistant.
+        You are a helpful language learning assistant. You have access to the foolwing tools {textual_description_of_tools}
         
-        The use is going to give you a command.
+        The user is going to give you a command.
+        
+        Your job is to check:
+        1. Which source language the user wants words from.
+        2. How many words they want.
+        
+        Here are some example workflows:
+        input: Get 20 random words in Spanish
+        source language: Spanish
+        number of words: 20
+        
+        input: Get 10 random words in German
+        source language: German
+        number of words: 10
         """)
     
     tools = local_tools
