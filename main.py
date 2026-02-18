@@ -107,3 +107,25 @@ async def build_graph():    # Turns the simple assitant function into a LangGrap
     builder.add_edge("tools", "assistant")
     
     return builder.compile()
+
+
+async def main():
+    """ Main async function to run the application"""
+    react_graph = await build_graph()
+    
+    user_prompt = "Please get 10 random words in Spanish."
+    
+    messages = [HumanMessage(content=user_prompt)]
+    
+    # Use ainvoke instead of invoke for async execution
+    result = await react_graph.ainvoke({
+        "messages": messages,
+        "source_language": None,
+        "number_of_words": None,
+    })
+    
+    print(f"Final messages: {result['messages'][-1].content}")
+    
+    
+if __name__ == "__main__":
+    asyncio.run(main())
