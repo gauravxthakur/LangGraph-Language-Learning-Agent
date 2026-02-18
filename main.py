@@ -3,6 +3,8 @@ from typing import Typed_Dict, Annotated, Optional, TypedDict
 from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph.message import add_messages
+from langgraph.graph import StateGraph, START, END
+from langgraph.prebuilt import ToolNode, tools_condition
 from agent.tools import get_n_random_words
 
 load_dotenv()
@@ -10,6 +12,8 @@ load_dotenv()
 # The agent state: which is like the short-term memory of the agent
 class AgentState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
+    source_language: Optional[str]
+    number_of_words: Optional[int]
     
 # Tools: these are additional capabilites that an agent can use to achieve its goal
 local_tools = [
@@ -76,4 +80,6 @@ def assistant(state: AgentState):
     
     return{
         "messages" : [llm_with_tools.invoke([sys_msg] + state["messages"])],
+        "source_language": state["source_language"],
+        "number_of_words": state["number_of_words"]
     }
