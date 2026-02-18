@@ -1,3 +1,4 @@
+import asyncio
 from dotenv import load_dotenv
 from typing import Typed_Dict, Annotated, Optional, TypedDict
 from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage
@@ -19,6 +20,12 @@ class AgentState(TypedDict):
 local_tools = [
     get_n_random_words,
 ]
+
+# Currently the below async function is unecessary and returns a copy of local tools, but will be essential for MCP integration
+# where we'll need async loading of remote tools from MCP servers
+async def setup_tools():
+    return [*local_tools] # list unpacking to return a copy of the list
+
 
 # The assistant function: this acts like the central planner of the agent, allowing the LLM
 # to decompose a problem, evaluate the steps already carried out, and select which
@@ -83,3 +90,6 @@ def assistant(state: AgentState):
         "source_language": state["source_language"],
         "number_of_words": state["number_of_words"]
     }
+    
+    
+async def build_graph():     # Turns the simple assitant function into a LangGraph agent
