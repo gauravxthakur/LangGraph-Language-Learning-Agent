@@ -92,4 +92,18 @@ def assistant(state: AgentState):
     }
     
     
-async def build_graph():     # Turns the simple assitant function into a LangGraph agent
+async def build_graph():    # Turns the simple assitant function into a LangGraph agent
+    """Build the state graph with properly initialized tools"""
+    tools = await setup_tools()
+    assistant.tools = tools
+    
+    builder = StateGraph(AgentState)
+    
+    builder.add_node("assistant", assistant)
+    builder.add_node("tools", ToolNode(tools))
+    
+    builder.add_edge(START, "assistant")
+    builder.add_conditional_edges("assistant", tools_condition)
+    builder.add_edge("tools", "assistant")
+    
+    return builder.compile()
