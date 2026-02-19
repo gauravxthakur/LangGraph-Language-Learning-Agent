@@ -2,6 +2,14 @@ import os
 import random
 import json
 from langchain_core.tools import tool
+from langchain_google_genai import ChatGoogleGenerativeAI
+from dotenv import load_dotenv
+from typing import List
+from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage
+
+load_dotenv()
+
+translation_model = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 
 @tool
 
@@ -94,3 +102,58 @@ def get_n_random_words_by_difficulty_level(language:str,
     return random_words
     
     
+    
+@tool
+def translate_words(random_words: List[str],
+                    source_language: str,
+                    target_language: str) -> dict:
+    
+    """
+    Translate a list of words from source to target language using a llm.
+    
+    Args:
+        random_words (list): List of words to translate.
+        source_language (str): Source language name.
+        target_language (str): Target language name.
+    
+    Returns:
+        dict: {"translations": [{"source": word, "target": translation}, ...]}
+    
+    Raises:
+        ValueError: If AI response cannot be parsed as valid JSON.
+    """
+    prompt = (
+        f"You are a precise translation engine.\n"
+        f"Translate the following {len(random_words)} words from {source_language} to {target_language}.\n"
+        f"Return ONLY valid JSON with this exact structure.\n"
+        f'{{"translations": [{{"source":"<original>","target":"<translated>"}}]}}\n'
+        f"No explanations, no extra fields, no markdown, no comments.\n"
+        f"Words: {json.dumps(random_words, ensure_ascii=False)}"
+    )
+    
+    response = translation_model.invoke([HumanMessage(content=prompt)])
+    text = getattr(response, "content", str(response))
+    
+    # Try to parse JSON strictly: if it fails, attempt to extract the first JSON object.
+    
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        import re
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            parsed = json.loads(match.group(0))
+        else:
+            raise ValueError("Could not parse JSON from translation response.")
+        
+    translations_list = parsed.get("translations", [])
+    # Build a mapping from the model output
+    model_map = {item.get("source", ""): item.get("target", "") for item in translations_list if isinstance(item, dict)}
+    
+    # Ensure we return translations in the same order as input: fall back to identity if missing
+    ordered_translations = [
+        {"source": w, "target": model_map.get(w, model_map.get(w.capitalize(), w))} for w in random_words
+    ]
+    return {
+        "translations": ordered_translations
+    }

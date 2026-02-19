@@ -8,7 +8,7 @@ from langgraph.graph.message import add_messages
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from IPython.display import Image, display
-from agent.tools import get_n_random_words, get_n_random_words_by_difficulty_level
+from agent.tools import get_n_random_words, get_n_random_words_by_difficulty_level, translate_words
 
 load_dotenv()
 
@@ -18,11 +18,13 @@ class AgentState(TypedDict):
     source_language: Optional[str]
     number_of_words: Optional[int]
     word_difficulty: Optional[str]
+    target_language: Optional[str]
     
 # Tools: these are additional capabilites that an agent can use to achieve its goal
 local_tools = [
     get_n_random_words,
     get_n_random_words_by_difficulty_level,
+    translate_words,
 ]
 
 # Currently the below async function is unecessary and returns a copy of local tools, but will be essential for MCP integration
@@ -103,6 +105,25 @@ def assistant(state: AgentState):
         'data/{language}/word-list-cleaned.json'
         Each entry in the JSON should have a 'word' key containing the word and 
         a 'word_difficulty' key containing the difficulty classification.
+    
+    
+    
+    def translate_words(random_words: list,
+                    source_language: str,
+                    target_language: str) -> dict:
+    
+    Translate a list of words from source to target language using a llm.
+    
+    Args:
+        random_words (list): List of words to translate.
+        source_language (str): Source language name.
+        target_language (str): Target language name.
+    
+    Returns:
+        dict: {"translations": [{"source": word, "target": translation}, ...]}
+    
+    Raises:
+        ValueError: If AI response cannot be parsed as valid JSON.
     """
     
     sys_msg = SystemMessage(content=f"""
@@ -114,6 +135,7 @@ def assistant(state: AgentState):
         1. Which source language the user wants words from.
         2. How many words they want.
         3. Whether they want words of a specific difficulty or just random words.
+        4. Whether they want these words translated into a target language.
         
         Here are some example workflows:
         input: Get 20 random words in Spanish
@@ -124,6 +146,17 @@ def assistant(state: AgentState):
         source language: German
         number of words: 10
         word difficulty: advanced
+        
+        input: Get 15 easy words in English and translate them to Spanish.
+        source language: English
+        number of words: 15
+        word difficulty: beginner
+        target language: Spanish
+        
+        input: Get 50 random words in German and translate them to English.
+        source language: German
+        number of words: 50
+        target language: English
         """)
     
     tools = local_tools
@@ -134,7 +167,8 @@ def assistant(state: AgentState):
         "messages" : [llm_with_tools.invoke([sys_msg] + state["messages"])],
         "source_language": state["source_language"],
         "number_of_words": state["number_of_words"],
-        "word_difficulty": state["word_difficulty"]
+        "word_difficulty": state["word_difficulty"],
+        "target_language": state["target_language"]
     }
     
     
@@ -168,7 +202,7 @@ async def main():
     """ Main async function to run the application"""
     react_graph = await build_graph()
     
-    user_prompt = "Please get 10 average difficulty words in German."
+    user_prompt = "Please get 10 advanced German words and translate them to English."
     
     messages = [HumanMessage(content=user_prompt)]
     
@@ -178,9 +212,10 @@ async def main():
         "source_language": None,
         "number_of_words": None,
         "word_difficulty": None,
+        "target_language": None
     })
     
-    print(f"Final messages: {result['messages'][-1].content}")
+    print(f"{result['messages'][-1].content}")
     
     
 if __name__ == "__main__":
