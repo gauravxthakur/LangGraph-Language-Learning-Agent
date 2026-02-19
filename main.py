@@ -8,9 +8,12 @@ from langgraph.graph.message import add_messages
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from IPython.display import Image, display
+from langchain_mcp_adapters.client import MultiServerMCPClient
 from agent.tools import get_n_random_words, get_n_random_words_by_difficulty_level, translate_words
 
 load_dotenv()
+
+CLANKI_JS = r"D:\LangGraph agents\clanki-master\clanki-master\build\index.js"
 
 # The agent state: which is like the short-term memory of the agent
 class AgentState(TypedDict):
@@ -30,14 +33,25 @@ local_tools = [
 # Currently the below async function is unecessary and returns a copy of local tools, but will be essential for MCP integration
 # where we'll need async loading of remote tools from MCP servers
 async def setup_tools():
-    return [*local_tools] # list unpacking to return a copy of the list
-
+    try:
+        client = MultiServerMCPClient({
+            "clanki": {
+                "command": "node",
+                "args": [CLANKI_JS],
+                "transport": "stdio"
+            }
+        })
+        mcp_tools = await client.get_tools()
+        return [*local_tools, *mcp_tools]
+    except Exception as e:
+        print(f"Failed to load MCP tools: {e}")
+        return local_tools  # Fallback to local tools only
 
 # The assistant function: this acts like the central planner of the agent, allowing the LLM
 # to decompose a problem, evaluate the steps already carried out, and select which
 # tools to use
 
-def assistant(state: AgentState):
+async def assistant(state: AgentState):
     
     textual_description_of_tools = """
     
@@ -157,9 +171,21 @@ def assistant(state: AgentState):
         source language: German
         number of words: 50
         target language: English
+        
+        input: Get 20 easy words in Spanish, translate them to English, and create a new Anki deck with them called Spanish::Easy
+        source language: Spanish
+        target language: English
+        number of words: 20
+        word difficulty: beginner
+        tools workflow: get_n_random_words_by_difficulty_level -> translate_words -> mcp_tools::create_deck -> mcp_tools::create_card
+
+        input: Get 10 random words in German, and create a new Anki deck with them called German::Words
+        source language: German
+        number of words: 10
+        tools workflow: get_n_random_words -> mcp_tools::create_deck -> mcp_tools::create_card
         """)
     
-    tools = local_tools
+    tools = await setup_tools()
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
     llm_with_tools = llm.bind_tools(tools)
     
